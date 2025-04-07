@@ -1,19 +1,28 @@
 const fastify = require('fastify')({ logger: true });
+const mongoose = require('mongoose');
 const WebSocket = require('ws');
-const bcrypt = require('bcrypt');
 
-// Enregistrement des plugins
+// Configuration JWT
 fastify.register(require('@fastify/jwt'), {
-  secret: 'secret-super-securise' 
+  secret: 'mon-secret-jwt'
 });
 
+// Middleware d'authentification
+fastify.decorate('authenticate', async (request, reply) => {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    reply.status(401).send({ error: 'Non autorisé' });
+  }
+});
 
-fastify.decorate('bcrypt', bcrypt);
-
-// routes
 fastify.register(require('./routes/auth'));
 
-// Lancement du serveur HTTP
+// Connexion à MongoDB
+mongoose.connect('mongodb://localhost:27017/auth-app')
+  .then(() => console.log('MongoDB connecté'))
+  .catch(err => console.error('Erreur MongoDB:', err));
+
 const start = async () => {
   try {
     await fastify.listen({ port: 3000 });
@@ -25,13 +34,13 @@ const start = async () => {
 };
 start();
 
-// Serveur WebSocket
+// WebSocket
 const wss = new WebSocket.Server({ port: 8080 });
 wss.on('connection', (ws) => {
   console.log('Nouvelle connexion WebSocket');
   ws.on('message', (message) => {
-    console.log('Message reçu :', message);
-    ws.send('Message bien reçu');
+    console.log('Message reçu:', message.toString());
+    ws.send('Message reçu!');
   });
 });
 

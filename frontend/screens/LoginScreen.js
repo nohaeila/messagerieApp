@@ -1,21 +1,40 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, Button } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Button, Alert } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { setIsLoggedIn } = route.params;
 
   const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+    
     try {
-      const response = await axios.post('http://localhost:3000/login', {
-        username,
-        password,
-      });
-      console.log('Connecté ! Token :', response.data.token);
-      // À terme, tu peux naviguer vers un écran de messagerie
+      setIsLoading(true);
+      
+      const response = await axios.post('http://10.0.2.2:3000/login', { username, password });
+      
+      // Stocker le token
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('userInfo', JSON.stringify(response.data.user));
+      
+      // Configurer le header par défaut pour les futures requêtes
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      
+      // Mettre à jour l'état de connexion
+      setIsLoggedIn(true);
     } catch (error) {
-      console.error('Erreur :', error.response?.data || error.message);
+      console.error('Erreur:', error.response?.data || error.message);
+      Alert.alert('Erreur', error.response?.data?.error || 'Erreur de connexion');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -27,6 +46,7 @@ export default function LoginScreen({ navigation }) {
         placeholder="Nom d'utilisateur"
         value={username}
         onChangeText={setUsername}
+        autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
@@ -35,7 +55,13 @@ export default function LoginScreen({ navigation }) {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Se connecter" onPress={handleLogin} />
+      
+      <Button 
+        title="Se connecter" 
+        onPress={handleLogin} 
+        disabled={isLoading}
+      />
+      
       <Button
         title="S'inscrire"
         onPress={() => navigation.navigate('Signup')}
@@ -61,5 +87,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
     padding: 10,
+    borderRadius: 5,
   },
 });
